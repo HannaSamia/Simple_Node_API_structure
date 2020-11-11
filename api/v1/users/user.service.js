@@ -13,12 +13,10 @@ module.exports = {
       if (error) {
         callBack(error);
       }
-      console.log(results);
       if(results[0]){
         return callBack("User already exists");
       }
       
-      console.log("here");
       pool.query(
         `insert into registration(firstName, lastName, gender, email, password, number) 
                   values(?,?,?,?,?,?)`,

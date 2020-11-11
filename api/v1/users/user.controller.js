@@ -26,6 +26,7 @@ module.exports = {
     create(body, (err, results) => {
       if (err) {
         const error = new Error(err);
+        error.statusCode = 400;
         return next(error);
       }
 
