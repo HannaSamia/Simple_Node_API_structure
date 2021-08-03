@@ -2,11 +2,12 @@ var uuid = require('uuid');
 var moment = require('moment');
 const pool = require("../../../config/database");
 const { sign,decode } = require("jsonwebtoken");
+const userController = require('./user.controller');
+const { resolve, reject } = require('bluebird');
 
 
 module.exports = {
   create: (data, callBack) => {
-
     pool.query("select id from registration where email = ?",
     [data.email],
     (error, results, fields) => {
@@ -16,7 +17,7 @@ module.exports = {
       if(results[0]){
         return callBack("User already exists");
       }
-      
+
       pool.query(
         `insert into registration(firstName, lastName, gender, email, password, number) 
                   values(?,?,?,?,?,?)`,
@@ -55,6 +56,17 @@ module.exports = {
     );
   },
 
+  getUserByUserEmailPromise: async (email) => {
+    return new Promise((resolve, reject)=>{
+      pool.query(`select * from registration where email = ?`,[email],(error, results)=>{
+          if(error){
+              return reject(error);
+          }
+          return resolve(results[0]);
+      });
+  });
+  },
+
   getUserByUserId: (id, callBack) => {
     pool.query(
       `select id,firstName,lastName,gender,email,number from registration where id = ?`,
@@ -85,7 +97,6 @@ module.exports = {
     numRows = results[0].numRows;
     numPages = Math.ceil(numRows / numPerPage);
     console.log('number of pages:', numPages);
-
     pool.query(
       'SELECT id,firstName,lastName,gender,email,number FROM registration ORDER BY ID LIMIT ? , ?',
       [skip,numPerPage],
@@ -154,12 +165,9 @@ module.exports = {
 
   generateTokenAndRefreshToken: (data, callBack)=>{
     const jwtid = uuid.v4();
-    console.log(process.env.EXPIRESIN);
     const jsontoken = sign({ id: data }, process.env.SECRET_KEY, {
       expiresIn: "2m",//2min
       jwtid: jwtid
-
-      //We can add a subject For example user email (must be string)
     });
 
     pool.query("SELECT UUID() as uuid",(err, result, fields) => {
@@ -191,11 +199,41 @@ module.exports = {
           console.log("No data found")
       }
   });
+  },
 
-    
-
-
-
+  generateTokenAndRefreshTokenpromise: async (data)=>{
+    const jwtid = uuid.v4();
+    const jsontoken = sign({ id: data }, process.env.SECRET_KEY, {
+      expiresIn: "2m",//2min
+      jwtid: jwtid
+    });
+    return new Promise((resolve, reject)=>{
+      pool.query("SELECT UUID() as uuid",(error, results)=>{
+          if(error){
+              return reject(error);
+          }
+          const uuid = results[0].uuid;
+          
+          pool.query(
+            `insert into refreshtoken(Id,UserId, JwtId, Used, Invalidated, ExpiryDate, CreationDate) 
+                      values(?,?,?,?,?,?,?)`,
+            [
+              uuid,
+              data,
+              jwtid,
+              false,
+              false,
+              moment().add(10, "d").toDate(),
+              moment().toDate()
+            ],(error, results, fields) => {
+              if (error) {
+                return reject(error);              
+              }
+              return resolve({token: jsontoken, refreshToken: uuid})
+            }
+          );
+      });
+  })
   },
 
   getJwtId: (token,callBack) => {

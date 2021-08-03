@@ -8,7 +8,7 @@ app.use(express.json());
 
 //v1
 //app.use("/api", v1Router);
-app.use("/api/v1", v1Router);
+app.use("/api/", v1Router);
 
 app.use((error, req, res, next) => {
   const status = error.statusCode || 500;
